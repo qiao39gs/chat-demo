@@ -54,6 +54,15 @@
   margin-top: 6px;
 }
 
+.usage {
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .actions {
   display: flex;
   align-items: center;

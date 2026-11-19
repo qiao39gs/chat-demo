@@ -6,6 +6,7 @@ import {
   type MessageVersions,
 } from '../../services/chat/branches.js'
 import { selectMessageVersion } from '../../services/chat/store.js'
+import { getQuestionInputTokens } from '../../services/chat/tokens.js'
 import type { Session } from '../../services/chat/types.js'
 import { closeSearchPanel } from '../search/searchPanelState.js'
 import { AssistantMessage } from './AssistantMessage.js'
@@ -141,6 +142,7 @@ export const MessageList = ({
 
   const lastIndex = messages.length - 1
   const uploadRetryId = getUploadRetryId(messages, streaming)
+  const questionInputTokens = getQuestionInputTokens(messages)
   return (
     <ScrollToBottomContext.Provider value={scrollToBottom}>
       <div ref={isMobile ? undefined : scrollRef} className={styles.container}>
@@ -152,6 +154,7 @@ export const MessageList = ({
                   key={message.id}
                   sessionId={session.id}
                   message={message}
+                  inputTokens={questionInputTokens.get(message.id)}
                   retryUploadId={uploadRetryId}
                   isFirst={index === 0}
                   isLast={index === lastIndex || index === lastIndex - 1}

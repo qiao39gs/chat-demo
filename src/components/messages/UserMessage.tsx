@@ -4,8 +4,10 @@ import { memo, useLayoutEffect, useRef, useState } from 'react'
 import { useIsMobile } from '../../app/viewport.js'
 import { IconEditOutline16 } from '../base/icons.js'
 import { editMessage, retryUpload } from '../../services/chat/store.js'
+import { useSettings } from '../../services/settings.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import type { UserMessage as UserMessageType } from '../../services/chat/types.js'
+import { formatTokenCount } from '../../utils/format.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
@@ -21,6 +23,7 @@ import styles from './UserMessage.module.css'
 export const UserMessage = memo(function UserMessage({
   sessionId,
   message,
+  inputTokens,
   retryUploadId,
   isFirst,
   isLast,
@@ -30,6 +33,8 @@ export const UserMessage = memo(function UserMessage({
 }: {
   sessionId: string
   message: UserMessageType
+  /** 本轮请求的输入 token，含历史上下文与附件；没有用量记录时不显示 */
+  inputTokens?: number
   /** 回答因补传附件失败可重试时为该回答 id */
   retryUploadId: string | null
   isFirst: boolean
@@ -39,6 +44,7 @@ export const UserMessage = memo(function UserMessage({
   onSelectVersion: SelectMessageVersion
 }) {
   const t = useTranslate()
+  const locale = useSettings((state) => state.locale)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -114,6 +120,11 @@ export const UserMessage = memo(function UserMessage({
         <>
           {message.content ? <div className={styles.bubble}>{message.content}</div> : null}
           <div className={styles.bottom}>
+            {inputTokens !== undefined ? (
+              <span className={styles.usage} title={t('tokenQuestionHint')}>
+                {t('tokenQuestion', { count: formatTokenCount(inputTokens, locale) })}
+              </span>
+            ) : null}
             <div className={clsx(styles.actions, isLast && styles.alwaysShow)}>
               {message.content ? <CopyButton text={message.content} /> : null}
               <IconButton

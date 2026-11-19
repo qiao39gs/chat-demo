@@ -24,6 +24,20 @@ declare const styles: {
   readonly apiConfigHeader: string
   readonly configEmpty: string
   readonly configList: string
+  readonly assistantList: string
+  readonly assistantRow: string
+  readonly assistantInfo: string
+  readonly assistantNameRow: string
+  readonly assistantBadge: string
+  readonly assistantPrompt: string
+  readonly assistantActions: string
+  readonly addAssistant: string
+  readonly assistantEditorDialog: string
+  readonly assistantEditor: string
+  readonly assistantField: string
+  readonly assistantFieldLabel: string
+  readonly assistantNameInput: string
+  readonly assistantPromptInput: string
   readonly configItem: string
   readonly configItemActive: string
   readonly configSelect: string

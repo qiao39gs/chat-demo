@@ -29,6 +29,35 @@
   margin-left: 113px;
 }
 
+.assistantBadge {
+  flex-shrink: 0;
+  max-width: 200px;
+  margin-left: 4px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: 100px;
+  background-color: var(--dsw-specific-selector);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tokenUsage {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background-color: var(--dsw-specific-selector);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .inputContainer {
   position: sticky;
   bottom: 0;

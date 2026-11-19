@@ -92,6 +92,8 @@ export type AssistantMessage = MessageBranch & {
   stopDetails?: StopDetails
   /** 最近一次请求的用量，续写后更新 */
   usage?: MessageUsage
+  /** 生成耗时（毫秒，续写时累计；不含附件补传和退避等待）；旧消息缺省 */
+  durationMs?: number
   error?: {
     /** upload：发送前补传附件失败，请求没有发出 */
     kind: ApiErrorKind | 'upload'
@@ -110,6 +112,8 @@ export type Session = {
   title: string
   createdAt: number
   updatedAt: number
+  /** 所属助手；缺省（旧会话、导入会话）归到默认助手。 */
+  assistantId?: string
   /** 包含所有分支的消息，按创建顺序存储。 */
   messages: Message[]
   /** undefined 表示线性消息列表；null 表示空会话。 */
@@ -117,7 +121,10 @@ export type Session = {
 }
 
 /** 会话列表元数据；消息只在打开会话时加载。 */
-export type SessionSummary = Pick<Session, 'id' | 'title' | 'createdAt' | 'updatedAt'>
+export type SessionSummary = Pick<
+  Session,
+  'id' | 'title' | 'createdAt' | 'updatedAt' | 'assistantId'
+>
 
 /** 显式提取字段，避免将完整会话的消息带进列表。 */
 export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
@@ -125,4 +132,5 @@ export const toSessionSummary = (session: SessionSummary): SessionSummary => ({
   title: session.title,
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,
+  assistantId: session.assistantId,
 })

@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { useRef, useState, type ReactNode } from 'react'
 import {
+  IconAssistantOutline16,
   IconDarkOutline16,
   IconDataOutline16,
   IconDownloadOutline16,
@@ -33,12 +34,13 @@ import { Modal } from '../base/Modal.js'
 import { Select } from '../base/Select.js'
 import { showToast } from '../base/toastState.js'
 import { ApiConfigsSetting } from './ApiConfigsField.js'
+import { AssistantsSection } from './AssistantsSection.js'
 import { closeSettings, useSettingsDialog, type SettingsSection } from './settingsDialogState.js'
 import styles from './Settings.module.css'
 
 /**
- * 设置弹窗：分「通用设置」（主题、语言、朗读音色、位置）、「API 配置」与「数据管理」（导入、导出、删除）。
- * 桌面端为居中弹窗、左侧导航；移动端为底部弹层、导航横排在内容上方
+ * 设置弹窗：分「通用设置」（主题、语言、朗读音色、位置）、「API 配置」、「助手」（名称与系统提示词）
+ * 与「数据管理」（导入、导出、删除）。桌面端为居中弹窗、左侧导航；移动端为底部弹层、导航横排在内容上方
  */
 export const SettingsDialog = () => {
   const open = useSettingsDialog((state) => state.open)
@@ -52,6 +54,11 @@ const sections: { value: SettingsSection; label: TranslationKey; icon: ReactNode
     icon: <IconSettingsOutline16 />,
   },
   { value: 'api', label: 'settingDialogAsideApiOptionLabel', icon: <IconLinkOutline16 /> },
+  {
+    value: 'assistants',
+    label: 'settingDialogAsideAssistantsOptionLabel',
+    icon: <IconAssistantOutline16 />,
+  },
   { value: 'data', label: 'settingDialogAsideDataOptionLabel', icon: <IconDataOutline16 /> },
 ]
 
@@ -102,6 +109,8 @@ const SettingsContent = () => {
             </>
           ) : section === 'api' ? (
             <ApiConfigsSetting />
+          ) : section === 'assistants' ? (
+            <AssistantsSection />
           ) : (
             <>
               <ImportHistory historyImport={historyImport} disabled={historyBusy} />
