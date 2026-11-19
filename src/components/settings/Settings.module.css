@@ -204,88 +204,179 @@
   color: var(--dsw-alias-state-error-primary);
 }
 
-.apiKey {
+.apiConfigHeader {
+  align-items: flex-start;
+}
+
+.apiConfigHeader .text {
+  padding-right: 8px;
+}
+
+.configEmpty {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.configList {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding-bottom: 4px;
+  margin-top: 12px;
 }
 
-.apiKeySaved,
-.apiKeyInput {
+.configItem {
   display: flex;
   align-items: center;
-  box-sizing: border-box;
-  height: var(--ds-control-height-xl);
+  gap: 4px;
+  min-height: 64px;
+  padding: 8px 6px 8px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  transition:
+    background-color var(--ds-transition-duration) var(--ds-ease-in-out),
+    border-color var(--ds-transition-duration) var(--ds-ease-in-out);
+
+  &:hover {
+    background-color: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.configItemActive {
+  border-color: var(--dsw-alias-brand-primary);
+  background-color: var(--dsw-specific-selector);
+
+  &:hover {
+    background-color: var(--dsw-specific-selector);
+  }
+}
+
+.configSelect {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.configRadio {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+}
+
+.configInfo {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.configName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   font-size: 14px;
-  line-height: 24px;
+  line-height: 20px;
+  font-weight: 500;
 }
 
-.apiKeySaved {
-  justify-content: space-between;
-  padding: 0 10px 0 16px;
-  border-radius: 28px;
-  background-color: var(--dsw-specific-login-input);
-}
-
-.apiKeyMask {
+.configNameText {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  color: var(--dsw-alias-label-caption);
-  user-select: none;
+  text-overflow: ellipsis;
 }
 
-.apiKeyInput {
-  gap: 12px;
+.configBadge {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 8px;
+  color: var(--dsw-alias-brand-text);
+  background-color: var(--dsw-alias-interactive-bg-hover);
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 400;
+}
+
+.configMeta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 17px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.configActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0;
+}
+
+.apiConfigDialog {
+  width: 440px;
+}
+
+.apiConfigForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 500;
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--ds-control-height-xl);
   padding: 0 14px;
-  border-radius: 22px;
   border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 22px;
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  caret-color: var(--dsw-alias-brand-text);
   transition: border-color var(--ds-transition-duration) var(--ds-ease-in-out);
 
-  &:focus-within {
+  &:focus {
     border-color: var(--dsw-alias-brand-primary);
   }
 
-  input {
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    padding: 0;
-    border: none;
-    outline: none;
-    background: transparent;
-    color: var(--dsw-alias-label-primary);
-    font: inherit;
-    caret-color: var(--dsw-alias-brand-text);
-
-    &::placeholder {
-      color: var(--dsw-alias-label-caption);
-    }
-  }
-}
-
-.divider {
-  flex-shrink: 0;
-  width: 1px;
-  height: 20px;
-  background-color: var(--dsw-alias-border-l2);
-}
-
-.confirm {
-  flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--dsw-alias-brand-text);
-  font: inherit;
-  line-height: 22px;
-  cursor: pointer;
-
-  &:disabled {
+  &::placeholder {
     color: var(--dsw-alias-label-caption);
-    cursor: default;
   }
+}
+
+.fieldHint {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 @media not all and (min-width: 768px) {
@@ -361,49 +452,32 @@
     flex: 1 1 auto;
   }
 
-  .apiKey {
-    padding-bottom: 0;
+  .apiConfigHeader {
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
-  .apiKeySaved,
-  .apiKeyInput {
+  .apiConfigHeader .text {
+    flex-basis: 100%;
+    padding-right: 0;
+  }
+
+  .configItem {
+    padding-right: 4px;
+  }
+
+  .apiConfigDialog {
+    width: calc(100vw - 32px);
+  }
+
+  .input {
     height: 52px;
-    padding: 0 12px 0 16px;
-    border: none;
-    border-radius: 40px;
-    background-color: var(--dsw-specific-login-input);
+    border-radius: 26px;
     font-size: 16px;
-  }
-
-  .apiKeySaved svg {
-    width: 20px;
-    height: 20px;
   }
 
   .cellButton svg {
     display: none;
-  }
-}
-
-.mobileConfirm {
-  display: block;
-  flex-shrink: 0;
-  width: calc(100% - 16px);
-  height: 52px;
-  margin: 16px 8px 0;
-  border: none;
-  border-radius: 100px;
-  background-color: var(--dsw-alias-button-primary-fill);
-  color: var(--dsw-static-neutral-bluish-00);
-  font: inherit;
-  font-size: 17px;
-  line-height: 24px;
-  font-weight: 500;
-  cursor: pointer;
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: default;
   }
 }
 
