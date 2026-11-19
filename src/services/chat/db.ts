@@ -123,6 +123,35 @@ export const renameSession = async (id: string, title: string): Promise<void> =>
   ])
 }
 
+/** 将指定会话迁移到另一个助手；详情与列表摘要原子更新。 */
+export const reassignSessions = async (ids: string[], assistantId: string): Promise<void> => {
+  if (ids.length === 0) {
+    return
+  }
+  const tx = (await getDB()).transaction(['sessions', 'sessionSummaries'], 'readwrite')
+  await Promise.all([
+    (async () => {
+      try {
+        const sessions = tx.objectStore('sessions')
+        const summaries = tx.objectStore('sessionSummaries')
+        for (const id of ids) {
+          const session = await sessions.get(id)
+          if (!session) {
+            continue
+          }
+          session.assistantId = assistantId
+          await sessions.put(session)
+          await summaries.put(storedSummary(session))
+        }
+      } catch (error) {
+        abortTransaction(tx)
+        throw error
+      }
+    })(),
+    tx.done,
+  ])
+}
+
 /** 删除会话，仅清理已无会话引用的本地原件；远端文件不删。 */
 export const deleteSession = async (sessionId: string): Promise<void> => {
   const tx = (await getDB()).transaction(['sessions', 'sessionSummaries', 'files'], 'readwrite')

@@ -28,6 +28,25 @@
   color: var(--dsw-alias-label-primary);
 }
 
+.assistant {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.assistantLabel {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.assistantSelect {
+  max-width: 240px;
+}
+
 @media (max-width: 439px) {
   .greeting {
     font-size: 20px;

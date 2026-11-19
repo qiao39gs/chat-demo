@@ -96,8 +96,7 @@
 
 .section {
   position: relative;
-  margin-top: 16px;
-  padding-top: 4px;
+  margin-top: 12px;
 
   &:first-child {
     margin-top: 0;
@@ -105,16 +104,82 @@
 }
 
 .sectionHeader {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  padding: 2px 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 2px;
+  border-radius: 10px;
+
+  &:hover,
+  &:focus-within {
+    background-color: var(--dsw-specific-sidebar-nav-item-hover);
+
+    .sectionNew {
+      color: var(--dsw-alias-label-primary);
+    }
+  }
+}
+
+.sectionToggle {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  gap: 4px;
+  box-sizing: border-box;
+  min-width: 0;
+  height: 30px;
+  padding: 0 2px 0 4px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
   font-size: 12px;
   line-height: 18px;
   font-weight: 500;
-  color: var(--dsw-alias-label-tertiary);
-  background-color: var(--dsw-specific-sidebar-fill);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
   user-select: none;
+
+  &:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--dsw-alias-button-primary-fill);
+  }
+}
+
+.sectionChevron {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.sectionName {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sectionCount {
+  flex-shrink: 0;
+  font-weight: 400;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.sectionHeader .sectionNew {
+  flex-shrink: 0;
+  margin-right: 2px;
+  color: var(--dsw-alias-label-secondary);
+  transition: color var(--ds-transition-duration) var(--ds-ease-in-out);
+}
+
+.sectionHeader .sectionNew:focus-visible {
+  color: var(--dsw-alias-label-primary);
+}
+
+.sectionSessions {
+  display: flex;
+  flex-direction: column;
 }
 
 .bottom {
@@ -215,7 +280,12 @@
   }
 
   .sectionHeader {
-    padding: 4px 10px 3px;
+    padding: 0 2px;
+  }
+
+  .sectionToggle {
+    height: 38px;
+    padding: 0 4px 0 6px;
     font-size: 14px;
     line-height: 22px;
   }

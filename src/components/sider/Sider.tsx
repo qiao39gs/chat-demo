@@ -1,10 +1,26 @@
 import clsx from 'clsx'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslate } from '../../i18n/index.js'
-import { IconPanelLeftOutline16, IconSettingsOutline16, NewChatIcon } from '../base/icons.js'
+import {
+  IconChevronDownOutline14,
+  IconChevronRightOutline14,
+  IconPanelLeftOutline16,
+  IconPlusOutline16,
+  IconSettingsOutline16,
+  NewChatIcon,
+} from '../base/icons.js'
+import {
+  findAssistant,
+  toggleAssistantCollapsed,
+  useAssistants,
+} from '../../services/assistants.js'
 import { setSiderCollapsed } from '../../services/settings.js'
-import { groupSessions } from '../../services/chat/sessionGroups.js'
-import { newChat, removeSession, useChatStore } from '../../services/chat/store.js'
+import {
+  newChat,
+  newChatWithAssistant,
+  removeSession,
+  useChatStore,
+} from '../../services/chat/store.js'
 import type { SessionSummary } from '../../services/chat/types.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
@@ -15,39 +31,25 @@ import { closeMobileSider, useMobileSider } from './mobileSiderState.js'
 import { SessionItem } from './SessionItem.js'
 import styles from './Sider.module.css'
 
-/** 展开的侧边栏：名称与收起按钮、开启新对话、按时间分组的会话列表、底部设置；移动端放在抽屉里，收起按钮关闭抽屉 */
+/** 展开的侧边栏：名称与收起按钮、开启新对话、按助手折叠分组的会话列表、底部设置；移动端放在抽屉里，收起按钮关闭抽屉 */
 export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
   const t = useTranslate()
   const sessions = useChatStore((state) => state.sessions)
   const activeId = useChatStore((state) => state.activeId)
-  const [now, setNow] = useState(Date.now)
-  const groups = useMemo(() => groupSessions(sessions, now, t), [sessions, now, t])
+  const assistants = useAssistants((state) => state.assistants)
+  const collapsedIds = useAssistants((state) => state.collapsedIds)
+  const groups = useMemo(
+    () =>
+      assistants.map((assistant) => ({
+        assistant,
+        sessions: sessions.filter(
+          (session) => findAssistant(assistants, session.assistantId).id === assistant.id
+        ),
+      })),
+    [assistants, sessions]
+  )
   const [deleting, setDeleting] = useState<SessionSummary | null>(null)
   const [deletePending, setDeletePending] = useState(false)
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    const refresh = () => {
-      clearTimeout(timer)
-      const time = Date.now()
-      setNow(time)
-      const midnight = new Date(time).setHours(24, 0, 0, 0)
-      timer = setTimeout(refresh, midnight - time)
-    }
-    const onVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        refresh()
-      }
-    }
-    refresh()
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('focus', refresh)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('focus', refresh)
-    }
-  }, [])
 
   return (
     <div className={clsx(styles.sider, mobile && styles.mobile)}>
@@ -76,19 +78,48 @@ export const Sider = ({ mobile = false }: { mobile?: boolean }) => {
       </button>
       <div className={styles.listWrap}>
         <div className={styles.list}>
-          {groups.map((group) => (
-            <div key={group.key} className={styles.section}>
-              <div className={styles.sectionHeader}>{group.label}</div>
-              {group.sessions.map((session) => (
-                <SessionItem
-                  key={session.id}
-                  session={session}
-                  active={session.id === activeId}
-                  onDelete={() => setDeleting(session)}
-                />
-              ))}
-            </div>
-          ))}
+          {groups.map(({ assistant, sessions: items }) => {
+            const collapsed = collapsedIds.includes(assistant.id)
+            return (
+              <div key={assistant.id} className={styles.section}>
+                <div className={styles.sectionHeader}>
+                  <button
+                    type="button"
+                    className={styles.sectionToggle}
+                    aria-expanded={!collapsed}
+                    onClick={() => toggleAssistantCollapsed(assistant.id)}
+                  >
+                    <span className={styles.sectionChevron}>
+                      {collapsed ? <IconChevronRightOutline14 /> : <IconChevronDownOutline14 />}
+                    </span>
+                    <span className={styles.sectionName}>{assistant.name}</span>
+                    <span className={styles.sectionCount}>{items.length}</span>
+                  </button>
+                  <IconButton
+                    className={styles.sectionNew}
+                    icon={<IconPlusOutline16 />}
+                    tooltip={t('newChatWithAssistant', { name: assistant.name })}
+                    onClick={() => {
+                      newChatWithAssistant(assistant.id)
+                      closeMobileSider()
+                    }}
+                  />
+                </div>
+                {collapsed ? null : (
+                  <div className={styles.sectionSessions}>
+                    {items.map((session) => (
+                      <SessionItem
+                        key={session.id}
+                        session={session}
+                        active={session.id === activeId}
+                        onDelete={() => setDeleting(session)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
       <div className={styles.bottom}>

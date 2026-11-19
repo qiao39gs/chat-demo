@@ -4,7 +4,8 @@
   align-items: center;
   box-sizing: border-box;
   height: 40px;
-  padding: 9px 6px 9px 10px;
+  /* 始终为右侧更多按钮留出空间，操作栏只淡入淡出，避免打开菜单后触发元素改变布局 */
+  padding: 9px 38px 9px 10px;
   border-radius: 12px;
   font-size: 14px;
   line-height: 22px;
@@ -22,9 +23,11 @@
     }
 
     &:hover,
-    &.active {
+    &.active,
+    &:focus-within {
       .action {
-        display: flex;
+        opacity: 1;
+        pointer-events: auto;
       }
     }
   }
@@ -40,9 +43,15 @@
 }
 
 .action {
-  display: none;
-  flex-shrink: 0;
-  margin-left: 4px;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity var(--ds-transition-duration) var(--ds-ease-in-out);
 }
 
 .renameInput {
@@ -61,14 +70,15 @@
 
 @media (hover: none) {
   .action {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 
 @media not all and (min-width: 768px) {
   .item {
     height: 44px;
-    padding: 11px 6px 11px 12px;
+    padding: 11px 38px 11px 12px;
     border-radius: 16px;
     font-size: 16px;
   }

@@ -3,6 +3,13 @@ import { createId } from '../../utils/id.js'
 import { ApiError, streamMessage } from '../api/client.js'
 import type { ChatModel, CreateMessageRequest } from '../api/types.js'
 import { extractFileIds, getFileErrorCode, isRetryableApiError } from '../api/errors.js'
+import {
+  findAssistant,
+  getAssistantSystemPrompt,
+  selectAssistant,
+  setAssistantCollapsed,
+  useAssistants,
+} from '../assistants.js'
 import { cancelUpload, describeUploadError, uploadAttachment, useUploads } from '../attachments.js'
 import { useSettings } from '../settings.js'
 import { appendBranch, getVisibleMessages, normalizeSession, selectVersion } from './branches.js'
@@ -34,8 +41,6 @@ import {
 
 /** deepseek-flash 同时支持深度思考与图片输入 */
 const MODEL: ChatModel = 'deepseek-flash'
-/** 所有生成请求统一携带的助手身份说明 */
-const SYSTEM_PROMPT = '该助手为DeepSeek，由深度求索公司创造。'
 /** 保留最近打开的详情；当前会话、生成中及尚未成功保存的会话不淘汰。 */
 const SESSION_CACHE_LIMIT = 5
 /** 安全审核固定开启，所有请求都走扩展模式 */
@@ -103,7 +108,10 @@ const getStreamController = (id: string) => {
 }
 
 const sameSummary = (a: SessionSummary, b: SessionSummary) =>
-  a.title === b.title && a.createdAt === b.createdAt && a.updatedAt === b.updatedAt
+  a.title === b.title &&
+  a.createdAt === b.createdAt &&
+  a.updatedAt === b.updatedAt &&
+  a.assistantId === b.assistantId
 
 const sessionAccess = new Map<string, number>()
 const unsavedSessions = new Set<string>()
@@ -447,8 +455,18 @@ export const newChat = () => {
   }
 }
 
+/** 从侧边栏某个助手分组开启新对话，同时展开该分组并把它设为新对话默认选择。 */
+export const newChatWithAssistant = (assistantId: string) => {
+  selectAssistant(assistantId)
+  setAssistantCollapsed(assistantId, false)
+  newChat()
+}
+
 export const selectSession = (id: string) => {
-  if (!get().importingHistory && get().sessions.some((session) => session.id === id)) {
+  const summary = get().sessions.find((session) => session.id === id)
+  if (!get().importingHistory && summary) {
+    // 打开会话时同步选中它的助手，之后开启新对话沿用同一助手。
+    selectAssistant(findAssistant(useAssistants.getState().assistants, summary.assistantId).id)
     touchSession(id)
     set({ activeId: id })
     void ensureSessionLoaded(id)
@@ -539,6 +557,56 @@ const removeSessionData = async (id: string): Promise<boolean> => {
   }
 }
 
+/**
+ * 删除助手前把它的会话迁移到另一个助手。先更新内存中的详情与列表，
+ * 已加载会话走正常保存队列，未加载会话直接改库，避免与流式保存交错。
+ */
+export const reassignAssistantSessions = async (fromId: string, toId: string): Promise<boolean> => {
+  if (get().importingHistory) {
+    return false
+  }
+  if (fromId === toId) {
+    return true
+  }
+  const ids = get()
+    .sessions.filter((session) => session.assistantId === fromId)
+    .map((session) => session.id)
+  if (ids.length === 0) {
+    return true
+  }
+  const epoch = historyEpoch
+  const loaded = new Set(Object.keys(get().sessionCache))
+  set((state) => ({
+    sessions: state.sessions.map((session) =>
+      session.assistantId === fromId ? { ...session, assistantId: toId } : session
+    ),
+    sessionCache: Object.fromEntries(
+      Object.entries(state.sessionCache).map(([id, session]) => [
+        id,
+        session.assistantId === fromId ? { ...session, assistantId: toId } : session,
+      ])
+    ),
+  }))
+  try {
+    await db.reassignSessions(
+      ids.filter((id) => !loaded.has(id)),
+      toId
+    )
+    if (epoch !== historyEpoch) {
+      return false
+    }
+    for (const id of ids) {
+      if (loaded.has(id) && getSession(id)) {
+        persist(id)
+      }
+    }
+    return true
+  } catch (error) {
+    db.reportStorageError('reassign sessions')(error)
+    return false
+  }
+}
+
 export const stopReply = (sessionId: string) => getStreamController(sessionId)?.abort()
 
 /**
@@ -563,11 +631,16 @@ export const sendMessage = (targetSessionId: string | null) => {
     return false
   }
   if (sessionId === null) {
+    const settings = useAssistants.getState()
+    const assistant = findAssistant(settings.assistants, settings.selectedId)
+    // 新会话创建后立即出现在侧边栏，展开对应分组避免刚发出的对话看不到。
+    setAssistantCollapsed(assistant.id, false)
     const session: Session = {
       id: createId(),
       title: '',
       createdAt: now,
       updatedAt: now,
+      assistantId: assistant.id,
       messages: [],
       rootMessageId: null,
     }
@@ -966,6 +1039,8 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
   }
   set((state) => ({ streaming: { ...state.streaming, [sessionId]: controller } }))
   let reply = initial
+  /** 续写沿用已有耗时，本轮只覆盖最近一次请求的耗时 */
+  const baseDurationMs = initial.durationMs ?? 0
   let frame = 0
   const flush = () => {
     cancelAnimationFrame(frame)
@@ -1000,7 +1075,7 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           useSettings.getState().apiKey ?? '',
           {
             model: initial.model ?? MODEL,
-            system: SYSTEM_PROMPT,
+            system: getAssistantSystemPrompt(getSession(sessionId)?.assistantId),
             messages,
             thinking: { type: initial.thinking ? 'enabled' : 'disabled' },
             safety_check: SAFETY_CHECK,
@@ -1009,29 +1084,38 @@ const streamReply = async (sessionId: string, initial: AssistantMessage, request
           },
           controller.signal
         )
-        const blockIndexes = new Map<number, number>()
-        for await (const event of events) {
-          receivedContent ||= event.type === 'content_block_start'
-          if (
-            event.type === 'message_delta' &&
-            (event.delta.stop_reason === 'end_turn' || event.delta.stop_reason === 'max_tokens') &&
-            event.delta.title?.trim() &&
-            titleRequests.has(controller) &&
-            !controller.signal.aborted &&
-            !get().importingHistory
-          ) {
-            const title = event.delta.title.trim()
-            updateSession(sessionId, (session) => (session.title ? session : { ...session, title }))
-            titleRequests.delete(controller)
+        const streamStartedAt = Date.now()
+        try {
+          const blockIndexes = new Map<number, number>()
+          for await (const event of events) {
+            receivedContent ||= event.type === 'content_block_start'
+            if (
+              event.type === 'message_delta' &&
+              (event.delta.stop_reason === 'end_turn' ||
+                event.delta.stop_reason === 'max_tokens') &&
+              event.delta.title?.trim() &&
+              titleRequests.has(controller) &&
+              !controller.signal.aborted &&
+              !get().importingHistory
+            ) {
+              const title = event.delta.title.trim()
+              updateSession(sessionId, (session) =>
+                session.title ? session : { ...session, title }
+              )
+              titleRequests.delete(controller)
+            }
+            reply = applyEvent(reply, event, Date.now(), blockIndexes)
+            if (document.visibilityState === 'hidden') {
+              flush()
+            } else {
+              frame ||= requestAnimationFrame(flush)
+            }
           }
-          reply = applyEvent(reply, event, Date.now(), blockIndexes)
-          if (document.visibilityState === 'hidden') {
-            flush()
-          } else {
-            frame ||= requestAnimationFrame(flush)
-          }
+          reply = settleReply(reply, 'done', Date.now())
+        } finally {
+          // 只记录生成本身，不包含附件补传与失败重试的等待；重试时覆盖为最后一次耗时。
+          reply = { ...reply, durationMs: baseDurationMs + (Date.now() - streamStartedAt) }
         }
-        reply = settleReply(reply, 'done', Date.now())
         break
       } catch (error) {
         if (controller.signal.aborted) {
