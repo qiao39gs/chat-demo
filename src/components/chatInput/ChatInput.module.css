@@ -297,6 +297,24 @@
   }
 }
 
+.modelSelect {
+  max-width: 160px;
+}
+
+@media not all and (min-width: 440px) {
+  .toggles .modelSelect {
+    min-width: 76px;
+    max-width: 96px;
+  }
+}
+
+/* 极窄屏优先保留思考、搜索和发送，模型仍在设置中可改 */
+@media not all and (min-width: 370px) {
+  .toggles .modelSelect {
+    display: none;
+  }
+}
+
 .right {
   display: flex;
   flex-shrink: 0;

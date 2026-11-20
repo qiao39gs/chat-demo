@@ -4,6 +4,7 @@ import { readMessageEvent } from './parseEvent.js'
 import { readServerSentEvents } from './sse.js'
 import type {
   ApiErrorBody,
+  ApiModel,
   CreateMessageRequest,
   FileObject,
   FilePurpose,
@@ -96,6 +97,74 @@ export const verifyApiConnection = async (
     headers: { Authorization: `Bearer ${connection.apiKey}` },
     signal,
   })
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+
+/**
+ * 读取模型列表：兼容 OpenAI 风格的 { data: [...] }、{ models: [...] } 与直接返回数组。
+ * 条目可以是模型 ID 字符串或带 id / name / display_name 的对象。
+ */
+const parseModels = (body: unknown): ApiModel[] | null => {
+  const list = Array.isArray(body)
+    ? body
+    : isRecord(body) && Array.isArray(body.data)
+      ? body.data
+      : isRecord(body) && Array.isArray(body.models)
+        ? body.models
+        : null
+  if (!list) {
+    return null
+  }
+  const seen = new Set<string>()
+  const models: ApiModel[] = []
+  for (const value of list) {
+    const record = isRecord(value) ? value : null
+    const id =
+      typeof value === 'string'
+        ? value.trim()
+        : typeof record?.id === 'string'
+          ? record.id.trim()
+          : typeof record?.name === 'string'
+            ? record.name.trim()
+            : ''
+    if (!id || seen.has(id)) {
+      continue
+    }
+    seen.add(id)
+    const displayName =
+      typeof record?.display_name === 'string' && record.display_name.trim()
+        ? record.display_name.trim()
+        : typeof record?.name === 'string' && record.name.trim() && record.name.trim() !== id
+          ? record.name.trim()
+          : id
+    models.push({ id, name: displayName })
+  }
+  return models
+}
+
+/** 获取当前 API 服务可用的模型列表；响应格式无法识别时按协议错误处理。 */
+export const fetchModels = async (
+  connection: ApiConnection,
+  signal?: AbortSignal
+): Promise<ApiModel[]> => {
+  const response = await request(apiUrl(connection.baseUrl, '/models'), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${connection.apiKey}` },
+    signal,
+  })
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    throw new ApiError('protocol', { key: 'apiModelsInvalidResponse' })
+  }
+  const models = parseModels(body)
+  if (!models) {
+    throw new ApiError('protocol', { key: 'apiModelsInvalidResponse' })
+  }
+  return models
 }
 
 /**

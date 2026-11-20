@@ -9,10 +9,23 @@ export type Locale = 'zh-CN' | 'en-US'
 /** 主题偏好；默认跟随系统 */
 export type ThemePreference = 'light' | 'dark' | 'system'
 
+/** 内置的默认模型；旧配置和未指定模型时使用 */
+export const DEFAULT_MODEL = 'deepseek-flash'
+
 /** 一组可在设置中保存和切换的 API 配置 */
 export type ApiConfig = ApiConnection & {
   id: string
   name: string
+  /** 对话请求使用的模型 ID，可自定义 */
+  model: string
+  /** 最近一次从 GET /models 获取的模型 ID，用于快速切换 */
+  models: string[]
+}
+
+type ApiConfigInput = ApiConnection & {
+  name: string
+  model?: string
+  models?: string[]
 }
 
 /** 本机设置，存 localStorage：API 配置、语言、主题、位置、朗读音色、深度思考与智能搜索开关、侧边栏收起状态 */
@@ -99,6 +112,23 @@ const initialThemePreference = (): ThemePreference => {
 /** 未保存过时使用服务端默认音色 stella（海星） */
 const initialTtsVoice = (): TtsVoice => (read(KEYS.ttsVoice) === 'tide' ? 'tide' : 'stella')
 
+/** 模型列表去重并去掉空白项，保持接口返回顺序 */
+const normalizeModels = (models: readonly unknown[] | undefined): string[] => {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const model of models ?? []) {
+    if (typeof model !== 'string') {
+      continue
+    }
+    const id = model.trim()
+    if (id && !seen.has(id)) {
+      seen.add(id)
+      result.push(id)
+    }
+  }
+  return result
+}
+
 /** 读取已保存的配置，丢弃损坏或缺少地址、Key 的条目 */
 const readApiConfigs = (): ApiConfig[] => {
   try {
@@ -122,6 +152,11 @@ const readApiConfigs = (): ApiConfig[] => {
           name: typeof record.name === 'string' && record.name.trim() ? record.name.trim() : 'API',
           baseUrl,
           apiKey,
+          model:
+            typeof record.model === 'string' && record.model.trim()
+              ? record.model.trim()
+              : DEFAULT_MODEL,
+          models: normalizeModels(Array.isArray(record.models) ? record.models : undefined),
         },
       ]
     })
@@ -146,6 +181,8 @@ const initialApiConfig = (): { configs: ApiConfig[]; activeId: string | null } =
       name: isChineseBrowser() ? '默认配置' : 'Default',
       baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL),
       apiKey: legacyApiKey,
+      model: DEFAULT_MODEL,
+      models: [],
     }
     write(KEYS.apiConfigs, JSON.stringify([migrated]))
     write(KEYS.activeApiConfig, migrated.id)
@@ -183,6 +220,9 @@ export const getActiveApiConnection = (): ApiConnection => {
     : { baseUrl: normalizeApiBaseUrl(DEFAULT_API_BASE_URL), apiKey: '' }
 }
 
+/** 当前配置使用的模型；没有配置时使用内置默认模型 */
+export const getActiveApiModel = (): string => getActiveApiConfig()?.model ?? DEFAULT_MODEL
+
 const saveApiConfigs = (apiConfigs: ApiConfig[], activeApiConfigId: string | null) => {
   write(KEYS.apiConfigs, apiConfigs.length > 0 ? JSON.stringify(apiConfigs) : null)
   write(KEYS.activeApiConfig, activeApiConfigId)
@@ -197,30 +237,49 @@ export const setActiveApiConfig = (id: string) => {
 }
 
 /** 新增后立即设为当前配置 */
-export const addApiConfig = (config: ApiConnection & { name: string }): ApiConfig => {
+export const addApiConfig = (config: ApiConfigInput): ApiConfig => {
   const created: ApiConfig = {
     id: createId(),
     name: config.name.trim(),
     baseUrl: normalizeApiBaseUrl(config.baseUrl),
     apiKey: config.apiKey.trim(),
+    model: config.model?.trim() || DEFAULT_MODEL,
+    models: normalizeModels(config.models),
   }
   saveApiConfigs([...useSettings.getState().apiConfigs, created], created.id)
   return created
 }
 
-export const updateApiConfig = (id: string, config: ApiConnection & { name: string }) => {
+export const updateApiConfig = (id: string, config: ApiConfigInput) => {
   const { apiConfigs, activeApiConfigId } = useSettings.getState()
   saveApiConfigs(
     apiConfigs.map((item) =>
       item.id === id
         ? {
-            id,
+            ...item,
             name: config.name.trim(),
             baseUrl: normalizeApiBaseUrl(config.baseUrl),
             apiKey: config.apiKey.trim(),
+            model: config.model?.trim() || item.model,
+            models: config.models ? normalizeModels(config.models) : item.models,
           }
         : item
     ),
+    activeApiConfigId
+  )
+}
+
+/** 切换当前配置使用的模型；聊天输入框的模型菜单也走这里 */
+export const setActiveModel = (model: string) => {
+  const value = model.trim()
+  const { apiConfigs, activeApiConfigId } = useSettings.getState()
+  const active =
+    apiConfigs.find((config) => config.id === activeApiConfigId) ?? apiConfigs[0] ?? null
+  if (!value || !active || active.model === value) {
+    return
+  }
+  saveApiConfigs(
+    apiConfigs.map((config) => (config.id === active.id ? { ...config, model: value } : config)),
     activeApiConfigId
   )
 }

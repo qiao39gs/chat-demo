@@ -54,6 +54,8 @@ declare const styles: {
   readonly fieldLabel: string
   readonly input: string
   readonly fieldHint: string
+  readonly modelRow: string
+  readonly modelSelect: string
   readonly cellButton: string
   readonly importConfirm: string
   readonly importConfirmText: string

@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { useState } from 'react'
 import { classifyApiError } from '../../services/api/errors.js'
-import { ApiError, verifyApiConnection } from '../../services/api/client.js'
+import { ApiError, fetchModels, verifyApiConnection } from '../../services/api/client.js'
 import {
   DEFAULT_API_BASE_URL,
   normalizeApiBaseUrl,
@@ -9,6 +9,7 @@ import {
 } from '../../services/api/config.js'
 import {
   addApiConfig,
+  DEFAULT_MODEL,
   removeApiConfig,
   setActiveApiConfig,
   updateApiConfig,
@@ -19,6 +20,7 @@ import { useTranslate, type TranslationKey } from '../../i18n/index.js'
 import { Button } from '../base/Button.js'
 import { IconButton } from '../base/IconButton.js'
 import { Modal } from '../base/Modal.js'
+import { Select } from '../base/Select.js'
 import { IconEditOutline16, IconPlusOutline16, IconTrashOutline16 } from '../base/icons.js'
 import { showToast } from '../base/toastState.js'
 import styles from './Settings.module.css'
@@ -77,6 +79,7 @@ export const ApiConfigsSetting = () => {
                         <span className={styles.configBadge}>{t('apiConfigActive')}</span>
                       ) : null}
                     </span>
+                    <span className={styles.configMeta}>{config.model}</span>
                     <span className={styles.configMeta}>{config.baseUrl}</span>
                     <span className={styles.configMeta}>{maskApiKey(config.apiKey)}</span>
                   </span>
@@ -149,9 +152,14 @@ const ApiConfigForm = ({
     () => config?.baseUrl ?? normalizeApiBaseUrl(DEFAULT_API_BASE_URL)
   )
   const [apiKey, setApiKey] = useState('')
+  const [model, setModel] = useState(() => config?.model ?? DEFAULT_MODEL)
+  const [models, setModels] = useState(() => config?.models ?? [])
   const [error, setError] = useState<TranslationKey | null>(null)
   const [failure, setFailure] = useState<FormFailure | null>(null)
   const [verifying, setVerifying] = useState(false)
+  const [fetchingModels, setFetchingModels] = useState(false)
+  const [modelStatus, setModelStatus] = useState<string | null>(null)
+  const [modelError, setModelError] = useState<string | null>(null)
 
   const describeFailure = (cause: unknown): string => {
     switch (classifyApiError(cause)) {
@@ -171,8 +179,42 @@ const ApiConfigForm = ({
     }
   }
 
+  const fetchModelList = async () => {
+    if (fetchingModels || verifying) {
+      return
+    }
+    const normalizedBaseUrl = parseBaseUrl(baseUrl)
+    if (!normalizedBaseUrl) {
+      setModelError(t('apiConfigUrlInvalid'))
+      return
+    }
+    const key = apiKey.trim() || config?.apiKey || ''
+    if (!key) {
+      setModelError(t('apiConfigKeyRequired'))
+      return
+    }
+    setModelError(null)
+    setModelStatus(null)
+    setFetchingModels(true)
+    try {
+      const list = await fetchModels({ baseUrl: normalizedBaseUrl, apiKey: key })
+      const ids = list.map((item) => item.id)
+      setModels(ids)
+      if (!model.trim() && ids[0]) {
+        setModel(ids[0])
+      }
+      setModelStatus(
+        ids.length > 0 ? t('apiConfigModelsFetched', { count: ids.length }) : t('apiConfigNoModels')
+      )
+    } catch (cause) {
+      setModelError(t('apiConfigModelsFetchFailed', { message: describeFailure(cause) }))
+    } finally {
+      setFetchingModels(false)
+    }
+  }
+
   const submit = async () => {
-    if (verifying) {
+    if (verifying || fetchingModels) {
       return
     }
     const trimmedName = name.trim()
@@ -190,6 +232,11 @@ const ApiConfigForm = ({
       setError('apiConfigKeyRequired')
       return
     }
+    const trimmedModel = model.trim()
+    if (!trimmedModel) {
+      setError('apiConfigModelRequired')
+      return
+    }
     const connection: ApiConnection = { baseUrl: normalizedBaseUrl, apiKey: key }
     setError(null)
     setFailure(null)
@@ -197,9 +244,14 @@ const ApiConfigForm = ({
     try {
       await verifyApiConnection(connection)
       if (config) {
-        updateApiConfig(config.id, { name: trimmedName, ...connection })
+        updateApiConfig(config.id, {
+          name: trimmedName,
+          ...connection,
+          model: trimmedModel,
+          models,
+        })
       } else {
-        addApiConfig({ name: trimmedName, ...connection })
+        addApiConfig({ name: trimmedName, ...connection, model: trimmedModel, models })
       }
       showToast({ key: 'apiConfigSaved' })
       onClose()
@@ -224,7 +276,7 @@ const ApiConfigForm = ({
           <Button variant="outlined" disabled={verifying} onClick={onClose}>
             {t('cancel')}
           </Button>
-          <Button disabled={verifying} onClick={() => void submit()}>
+          <Button disabled={verifying || fetchingModels} onClick={() => void submit()}>
             {t(verifying ? 'apiKeyVerifying' : 'confirm')}
           </Button>
         </>
@@ -233,6 +285,10 @@ const ApiConfigForm = ({
       <div
         className={styles.apiConfigForm}
         onKeyDown={(event) => {
+          // 模型选择器和获取按钮也在表单内，回车不应触发保存
+          if (event.target instanceof HTMLButtonElement) {
+            return
+          }
           if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
             event.preventDefault()
             void submit()
@@ -288,6 +344,56 @@ const ApiConfigForm = ({
             }}
           />
         </label>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>{t('apiConfigModel')}</span>
+          <div className={styles.modelRow}>
+            <input
+              className={styles.input}
+              value={model}
+              placeholder={DEFAULT_MODEL}
+              aria-label={t('apiConfigModel')}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => {
+                setError(null)
+                setFailure(null)
+                setModelStatus(null)
+                setModelError(null)
+                setModel(event.target.value)
+              }}
+            />
+            <Button
+              variant="outlined"
+              size="m"
+              className={styles.cellButton}
+              disabled={fetchingModels || verifying}
+              onClick={() => void fetchModelList()}
+            >
+              {t(fetchingModels ? 'apiConfigFetchingModels' : 'apiConfigFetchModels')}
+            </Button>
+          </div>
+          <span className={styles.fieldHint}>{t('apiConfigModelHint')}</span>
+          {models.length > 0 ? (
+            <Select
+              ariaLabel={t('apiConfigSelectFetchedModel')}
+              className={styles.modelSelect}
+              value={models.includes(model.trim()) ? model.trim() : ''}
+              placeholder={t('apiConfigSelectFetchedModel')}
+              options={models.map((id) => ({ value: id, label: id }))}
+              disabled={fetchingModels}
+              onChange={(value) => {
+                setError(null)
+                setFailure(null)
+                setModel(value)
+              }}
+            />
+          ) : null}
+          {modelError ? (
+            <span className={styles.error}>{modelError}</span>
+          ) : modelStatus ? (
+            <span className={styles.fieldHint}>{modelStatus}</span>
+          ) : null}
+        </div>
         {error ? <div className={styles.error}>{t(error)}</div> : null}
         {!error && failure ? (
           <div className={styles.error}>{describeFailure(failure.cause)}</div>

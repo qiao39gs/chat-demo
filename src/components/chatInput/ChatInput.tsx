@@ -8,7 +8,9 @@ import {
   IconThinkOutline14,
 } from '../base/icons.js'
 import {
+  DEFAULT_MODEL,
   getActiveApiConnection,
+  setActiveModel,
   setSearch,
   setThinking,
   useSettings,
@@ -27,6 +29,7 @@ import {
 } from '../../services/chat/drafts.js'
 import { stopReadAloud } from '../../services/speech/readAloud.js'
 import { IconButton } from '../base/IconButton.js'
+import { Select } from '../base/Select.js'
 import { Tooltip } from '../base/Tooltip.js'
 import { ensureApiKey } from '../settings/settingsDialogState.js'
 import { DragMask, useFileDrop } from './DragMask.js'
@@ -58,6 +61,14 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const importingHistory = useChatStore((state) => state.importingHistory)
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
+  const apiConfigs = useSettings((state) => state.apiConfigs)
+  const activeApiConfigId = useSettings((state) => state.activeApiConfigId)
+  const activeApiConfig =
+    apiConfigs.find((config) => config.id === activeApiConfigId) ?? apiConfigs[0] ?? null
+  const model = activeApiConfig?.model ?? DEFAULT_MODEL
+  const modelOptions = Array.from(
+    new Set([model, ...(activeApiConfig?.models ?? [])].filter(Boolean))
+  ).map((value) => ({ value, label: value }))
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const togglesRef = useRef<HTMLDivElement>(null)
@@ -77,7 +88,7 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
     const observer = new ResizeObserver(updateLabels)
     observer.observe(toggles)
     return () => observer.disconnect()
-  }, [t])
+  }, [t, model])
 
   const acceptFiles = (files: File[]) => {
     if (files.length === 0 || useChatStore.getState().importingHistory || !ensureApiKey()) {
@@ -207,6 +218,16 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
       <div className={styles.functionRow}>
         {/* 深度思考 / 智能搜索开关，tooltip 在按钮上方 */}
         <div ref={togglesRef} className={styles.toggles}>
+          {activeApiConfig ? (
+            <Select
+              ariaLabel={t('modelSelect')}
+              className={styles.modelSelect}
+              value={model}
+              options={modelOptions}
+              disabled={streaming || importingHistory}
+              onChange={setActiveModel}
+            />
+          ) : null}
           <Tooltip content={t('deactivatedThinkTooltip')}>
             <button
               type="button"
